@@ -6,3 +6,14 @@ checkpoints*/*
 memo.txt
 old
 .DS_Store
+
+*.pkl
+
+# build files for run UNREAL
+assets
+baselab
+deepmind
+q3map2
+bspc
+deepmind_lab.so
+libdmlab.so
