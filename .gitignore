@@ -1,8 +1,8 @@
 *.pyc
 debug*.png
 *.mov
-log/*
-checkpoints*/*
+log
+checkpoints
 memo.txt
 old
 .DS_Store

@@ -78,3 +78,18 @@ To show result after training, run this command.
 ```
 bazel run //unreal:display --define headless=glx
 ```
+
+## Notes:
+With the built files in the subdirectory "org_deepmind_lab", we can start training or display by
+```
+python main.py 
+```
+or
+```
+python display.py
+```
+
+Additionally, we can record experience of human player by
+```
+python recorder.py
+```
