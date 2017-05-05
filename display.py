@@ -137,7 +137,6 @@ class Display(object):
     maze = self.mazemap.get_map(84, 84)
     maze = maze*255
     maze = maze.astype(np.uint8)
-    maze = np.stack([maze for _ in range(3)], axis=2)
     image = pygame.image.frombuffer(maze, (84,84), 'RGB')
     self.surface.blit(image, (300, 10))
     self.draw_center_text('MazeMap', 342, 100)
