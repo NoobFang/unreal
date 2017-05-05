@@ -8,6 +8,7 @@ import cv2
 import pygame, sys, os
 from pygame.locals import *
 import scipy.misc as misc
+from pprint import pprint
 
 from environment.environment import Environment
 from train.experience import Experience, ExperienceFrame
@@ -15,7 +16,7 @@ from constants import *
 
 MAX_EXP = 1e4
 DISP_SIZE = (84, 84) # width, height
-FPS = 15
+FPS = 30
 BLACK = (0, 0, 0)
 
 class Recorder(object):
@@ -35,9 +36,13 @@ class Recorder(object):
 
   def update(self):
     self.surface.fill(BLACK)
-    obs, reward, terminal, pc, action = self.process()
+    obs, reward, terminal, pc, action, depth, v_linear, v_angular = self.process()
     if action != 3:
-      self.record(obs, reward, terminal, pc, action)
+      print('linear velocity: ', end='')
+      pprint(v_linear), 
+      print('angular velocity: ', end='')
+      pprint(v_angular)
+      #self.record(obs, reward, terminal, pc, action)
     pygame.display.update()
 
   def choose_action(self):
@@ -53,14 +58,15 @@ class Recorder(object):
 
   def process(self):
     action = self.choose_action()
-    obs, reward, terminal, pc = self.env.process(action)
+    obs, reward, terminal, pc, v_linear, v_angular = self.env.process(action)
     #data = misc.imresize(obs*255.0, DISP_SIZE)
-    data = obs * 255.0
+    data = obs[:,:,:3] * 255.0
     image = pygame.image.frombuffer(data.astype(np.uint8), DISP_SIZE, "RGB")
+    depth = obs[:,:,3] * 255.0
     self.surface.blit(image, (0,0))
     if terminal:
       self.env.reset()
-    return obs, reward, terminal, pc, action
+    return obs, reward, terminal, pc, action, depth, v_linear, v_angular
 
   def record(self, obs, reward, terminal, pc, action):
     last_state = self.env.last_state
@@ -87,7 +93,7 @@ if __name__ == '__main__':
     for event in pygame.event.get():
       if event.type == pygame.QUIT:
         running = False
-        recorder.save()
+        #recorder.save()
 
     recorder.update()
     clock.tick(FPS)

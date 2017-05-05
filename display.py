@@ -16,6 +16,8 @@ from model.model import UnrealModel
 from constants import *
 from train.experience import ExperienceFrame
 
+from maze_map import MazeMap
+
 FRAME_SAVE_DIR = "/tmp/unreal_frames"
 
 BLUE  = (128, 128, 255)
@@ -42,7 +44,7 @@ class MovieWriter(object):
     self.vout.write(frame)
 
   def close(self):
-    self.vout.release() 
+    self.vout.release()
     self.vout = None
 
 
@@ -69,7 +71,7 @@ class ValueHistory(object):
   def add_value(self, value):
     self._values.append(value)
 
-  @property    
+  @property
   def is_empty(self):
     return len(self._values) == 0
 
@@ -81,7 +83,7 @@ class ValueHistory(object):
 class Display(object):
   def __init__(self, display_size):
     pygame.init()
-    
+
     self.surface = pygame.display.set_mode(display_size, 0, 24)
     pygame.display.set_caption('UNREAL')
 
@@ -92,6 +94,7 @@ class Display(object):
     self.value_history = ValueHistory()
     self.state_history = StateHistory()
     self.episode_reward = 0
+    self.mazemap = MazeMap()
 
   def update(self, sess):
     self.surface.fill(BLACK)
@@ -107,9 +110,9 @@ class Display(object):
   def draw_text(self, str, left, top, color=WHITE):
     text = self.font.render(str, True, color, BLACK)
     text_rect = text.get_rect()
-    text_rect.left = left    
+    text_rect.left = left
     text_rect.top = top
-    self.surface.blit(text, text_rect)  
+    self.surface.blit(text, text_rect)
 
   def draw_center_text(self, str, center_x, top):
     text = self.font.render(str, True, WHITE, BLACK)
@@ -121,7 +124,7 @@ class Display(object):
   def show_pixel_change(self, pixel_change, left, top, rate, label):
     """
     Show pixel change
-    """    
+    """
     pixel_change_ = np.clip(pixel_change * 255.0 * rate, 0.0, 255.0)
     data = pixel_change_.astype(np.uint8)
     data = np.stack([data for _ in range(3)], axis=2)
@@ -129,7 +132,15 @@ class Display(object):
     image = pygame.image.frombuffer(data, (20*4,20*4), 'RGB')
     self.surface.blit(image, (left+8+4, top+8+4))
     self.draw_center_text(label, left + 100/2, top + 100)
-    
+
+  def show_map(self):
+    maze = self.mazemap.get_map(84, 84)
+    maze = maze*255
+    maze = maze.astype(np.uint8)
+    maze = np.stack([maze for _ in range(3)], axis=2)
+    image = pygame.image.frombuffer(maze, (84,84), 'RGB')
+    self.surface.blit(image, (300, 10))
+    self.draw_center_text('MazeMap', 342, 100)
 
   def show_policy(self, pi):
     """
@@ -138,13 +149,13 @@ class Display(object):
     start_x = 10
 
     y = 150
-  
+
     for i in range(len(pi)):
       width = pi[i] * 100
       pygame.draw.rect(self.surface, WHITE, (start_x, y, width, 10))
       y += 20
     self.draw_center_text("PI", 50, y)
-  
+
   def show_image(self, state):
     """
     Show input image
@@ -207,7 +218,7 @@ class Display(object):
     y = 150
 
     labels = ["0", "+", "-"]
-    
+
     for i in range(len(rp_c)):
       width = rp_c[i] * 100
 
@@ -218,18 +229,18 @@ class Display(object):
       pygame.draw.rect(self.surface, color, (start_x+15, y, width, 10))
       self.draw_text(labels[i], start_x, y-1, color)
       y += 20
-    
+
     self.draw_center_text("RP", start_x + 100/2, y)
 
   def show_reward(self):
-    self.draw_text("REWARD: {}".format(int(self.episode_reward)), 310, 10)
+    self.draw_text("REWARD: {}".format(int(self.episode_reward)), 10, 250)
 
   def process(self, sess):
     last_action = self.environment.last_action
     last_reward = np.clip(self.environment.last_reward, -1, 1)
     last_action_reward = ExperienceFrame.concat_action_and_reward(last_action, self.action_size,
                                                                   last_reward)
-    
+
     if not USE_PIXEL_CHANGE:
       pi_values, v_value = self.global_network.run_base_policy_and_value(sess,
                                                                          self.environment.last_state,
@@ -239,35 +250,40 @@ class Display(object):
                                                                                 self.environment.last_state,
                                                                                 last_action_reward)
     self.value_history.add_value(v_value)
-    
+
     action = self.choose_action(pi_values)
-    state, reward, terminal, pixel_change = self.environment.process(action)
+    state, reward, terminal, pixel_change, vtrans, vrot = self.environment.process(action)
     self.episode_reward += reward
-  
+    self.mazemap.update(vtrans, vrot)
+    if reward > 9:
+      self.mazemap.reset()
+
     if terminal:
       self.environment.reset()
       self.episode_reward = 0
-      
-    self.show_image(state)
+      self.mazemap.reset()
+
+    self.show_image(state[:,:,:3])
     self.show_policy(pi_values)
     self.show_value()
     self.show_reward()
-    
+    self.show_map()
+
     if USE_PIXEL_CHANGE:
       self.show_pixel_change(pixel_change, 100, 0, 3.0, "PC")
       self.show_pixel_change(pc_q[:,:,action], 200, 0, 0.4, "PC Q")
-  
+
     if USE_REWARD_PREDICTION:
       if self.state_history.is_full:
         rp_c = self.global_network.run_rp_c(sess, self.state_history.states)
         self.show_reward_prediction(rp_c, reward)
-  
+
     self.state_history.add_state(state)
 
   def get_frame(self):
     data = self.surface.get_buffer().raw
     return data
-  
+
 sess = tf.Session()
 init = tf.global_variables_initializer()
 sess.run(init)
@@ -295,19 +311,19 @@ fps = 15
 if recording:
   writer = MovieWriter("out.mov", display_size, fps)
 
-if frame_saving:  
+if frame_saving:
   frame_count = 0
   if not os.path.exists(FRAME_SAVE_DIR):
     os.mkdir(FRAME_SAVE_DIR)
-    
+
 while running:
   for event in pygame.event.get():
     if event.type == pygame.QUIT:
       running = False
-      
+
   display.update(sess)
   clock.tick(fps)
-  
+
   if recording or frame_saving:
     frame_str = display.get_frame()
     d = np.fromstring(frame_str, dtype=np.uint8)
@@ -321,4 +337,4 @@ while running:
 
 if recording:
   writer.close()
-  
+

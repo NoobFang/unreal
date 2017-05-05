@@ -93,7 +93,7 @@ class Trainer(object):
                                                           last_action_reward)
     action = self.choose_action(pi_)
     
-    new_state, reward, terminal, pixel_change = self.environment.process(action)
+    new_state, reward, terminal, pixel_change, _, _ = self.environment.process(action)
     
     frame = ExperienceFrame(prev_state, reward, action, terminal, pixel_change,
                             last_action, last_reward)
@@ -156,7 +156,7 @@ class Trainer(object):
       prev_state = self.environment.last_state
 
       # Process game
-      new_state, reward, terminal, pixel_change = self.environment.process(action)
+      new_state, reward, terminal, pixel_change, _, _ = self.environment.process(action)
       frame = ExperienceFrame(prev_state, reward, action, terminal, pixel_change,
                               last_action, last_reward)
 

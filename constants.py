@@ -2,8 +2,8 @@
 LOCAL_T_MAX = 20 # repeat step size
 RMSP_ALPHA = 0.99 # decay parameter for RMSProp
 RMSP_EPSILON = 0.1 # epsilon parameter for RMSProp
-CHECKPOINT_DIR = '/home/fhy/unreal/checkpoints/random3/new_RGBD'
-LOG_FILE = '/home/fhy/unreal/log/random3/new_RGBD'
+CHECKPOINT_DIR = '/home/fhy/unreal/checkpoints/random3/RGBD'
+LOG_FILE = '/home/fhy/unreal/log/random3/RGBD'
 INITIAL_ALPHA_LOW = 1e-4    # log_uniform low limit for learning rate
 INITIAL_ALPHA_HIGH = 5e-3   # log_uniform high limit for learning rate
 PARALLEL_SIZE = 8 # parallel thread size

@@ -19,7 +19,7 @@ def worker(conn):
   level = ENV_NAME
   env = deepmind_lab.Lab(
     level,
-    ['RGB_INTERLACED'],
+    ['RGBD_INTERLACED', 'VEL.TRANS', 'VEL.ROT'], # return RGBD, velocity of transport, velocity of rotation
     config={
       'fps': str(60),
       'width': str(84),
@@ -32,13 +32,13 @@ def worker(conn):
 
     if command == COMMAND_RESET:
       env.reset()
-      obs = env.observations()['RGB_INTERLACED']
+      obs = env.observations()
       conn.send(obs)
     elif command == COMMAND_ACTION:
       reward = env.step(arg, num_steps=4)
       terminal = not env.is_running()
       if not terminal:
-        obs = env.observations()['RGB_INTERLACED']
+        obs = env.observations()
       else:
         obs = 0
       conn.send([obs, reward, terminal])
@@ -57,17 +57,18 @@ def _action(*entries):
 
 class LabEnvironment(environment.Environment):
   ACTION_LIST = [
-    _action(-20,   0,  0,  0, 0, 0, 0), # look_left
-    _action( 20,   0,  0,  0, 0, 0, 0), # look_right
+    _action(-16,   0,  0,  0, 0, 0, 0), # look_left
+    _action( 16,   0,  0,  0, 0, 0, 0), # look_right
     #_action(  0,  10,  0,  0, 0, 0, 0), # look_up
     #_action(  0, -10,  0,  0, 0, 0, 0), # look_down
-    _action(  0,   0, -1,  0, 0, 0, 0), # strafe_left
-    _action(  0,   0,  1,  0, 0, 0, 0), # strafe_right
+    #_action(  0,   0, -1,  0, 0, 0, 0), # strafe_left
+    #_action(  0,   0,  1,  0, 0, 0, 0), # strafe_right
     _action(  0,   0,  0,  1, 0, 0, 0), # forward
-    _action(  0,   0,  0, -1, 0, 0, 0), # backward
+    #_action(  0,   0,  0, -1, 0, 0, 0), # backward
     #_action(  0,   0,  0,  0, 1, 0, 0), # fire
     #_action(  0,   0,  0,  0, 0, 1, 0), # jump
-    #_action(  0,   0,  0,  0, 0, 0, 1)  # crouch
+    #_action(  0,   0,  0,  0, 0, 0, 1),  # crouch
+    #_action(  0,  0,  0,  0,  0, 0, 0) # noop
   ]
 
   @staticmethod
@@ -86,8 +87,10 @@ class LabEnvironment(environment.Environment):
   def reset(self):
     self.conn.send([COMMAND_RESET, 0])
     obs = self.conn.recv()
-    
-    self.last_state = self._preprocess_frame(obs)
+
+    self.last_state = self._preprocess_frame(obs['RGBD_INTERLACED'])
+    self.last_vtrans = obs['VEL.TRANS']
+    self.last_vrot = obs['VEL.ROT']
     self.last_action = 0
     self.last_reward = 0
 
@@ -110,12 +113,18 @@ class LabEnvironment(environment.Environment):
     obs, reward, terminal = self.conn.recv()
 
     if not terminal:
-      state = self._preprocess_frame(obs)
+      state = self._preprocess_frame(obs['RGBD_INTERLACED'])
+      vtrans = obs['VEL.TRANS']
+      vrot = obs['VEL.ROT']
     else:
       state = self.last_state
+      vtrans = self.last_vtrans
+      vrot = self.last_vrot
     
     pixel_change = self._calc_pixel_change(state, self.last_state)
     self.last_state = state
+    self.last_vtrans = vtrans
+    self.last_vrot = vrot
     self.last_action = action
     self.last_reward = reward
-    return state, reward, terminal, pixel_change
+    return state, reward, terminal, pixel_change, vtrans, vrot
