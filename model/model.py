@@ -70,7 +70,7 @@ class UnrealModel(object):
 
   def _create_base_network(self):
     # State (Base image input)
-    self.base_input = tf.placeholder("float", [None, 84, 84, 3])
+    self.base_input = tf.placeholder("float", [None, 84, 84, 4])
 
     # Last action and reward
     self.base_last_action_reward_input = tf.placeholder("float", [None, self._action_size+1])
@@ -97,7 +97,7 @@ class UnrealModel(object):
   def _base_conv_layers(self, state_input, reuse=False):
     with tf.variable_scope("base_conv", reuse=reuse) as scope:
       # Weights
-      W_conv1, b_conv1 = self._conv_variable([8, 8, 3, 16],  "base_conv1")
+      W_conv1, b_conv1 = self._conv_variable([8, 8, 4, 16],  "base_conv1")
       W_conv2, b_conv2 = self._conv_variable([4, 4, 16, 32], "base_conv2")
 
       # Nodes
@@ -160,7 +160,7 @@ class UnrealModel(object):
 
   def _create_pc_network(self):
     # State (Image input) 
-    self.pc_input = tf.placeholder("float", [None, 84, 84, 3])
+    self.pc_input = tf.placeholder("float", [None, 84, 84, 4])
 
     # Last action and reward
     self.pc_last_action_reward_input = tf.placeholder("float", [None, self._action_size+1])
@@ -220,7 +220,7 @@ class UnrealModel(object):
 
   def _create_vr_network(self):
     # State (Image input)
-    self.vr_input = tf.placeholder("float", [None, 84, 84, 3])
+    self.vr_input = tf.placeholder("float", [None, 84, 84, 4])
 
     # Last action and reward
     self.vr_last_action_reward_input = tf.placeholder("float", [None, self._action_size+1])
@@ -241,7 +241,7 @@ class UnrealModel(object):
 
     
   def _create_rp_network(self):
-    self.rp_input = tf.placeholder("float", [3, 84, 84, 3])
+    self.rp_input = tf.placeholder("float", [3, 84, 84, 4])
 
     # RP conv layers
     rp_conv_output = self._base_conv_layers(self.rp_input, reuse=True)

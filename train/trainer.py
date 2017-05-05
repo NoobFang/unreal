@@ -65,9 +65,9 @@ class Trainer(object):
     return np.random.choice(range(len(pi_values)), p=pi_values)
 
   
-  def _record_score(self, sess, summary_writer, summary_op, score_input, score, global_t):
+  def _record_score(self, sess, summary_writer, summary_op, score_input, score, average_entropy, entropy, global_t):
     summary_str = sess.run(summary_op, feed_dict={
-      score_input: score
+      score_input: score, average_entropy: entropy
     })
     summary_writer.add_summary(summary_str, global_t)
     summary_writer.flush()
@@ -115,14 +115,15 @@ class Trainer(object):
         global_t,  elapsed_time, steps_per_sec, steps_per_sec * 3600 / 1000000.))
     
 
-  def _process_base(self, sess, global_t, summary_writer, summary_op, score_input):
+  def _process_base(self, sess, global_t, summary_writer, summary_op, score_input, average_entropy):
     # [Base A3C]
     states = []
     last_action_rewards = []
     actions = []
     rewards = []
     values = []
-
+    episode_entropy = 0.0
+    episode_steps = 0
     terminal_end = False
 
     start_lstm_state = self.local_network.base_lstm_state_out
@@ -163,6 +164,8 @@ class Trainer(object):
       self.experience.add_frame(frame)
 
       self.episode_reward += reward
+      episode_entropy += np.sum(pi_*np.log(pi_))
+      episode_steps += 1
 
       rewards.append( reward )
 
@@ -173,9 +176,11 @@ class Trainer(object):
         print("score={}".format(self.episode_reward))
 
         self._record_score(sess, summary_writer, summary_op, score_input,
-                           self.episode_reward, global_t)
+                           self.episode_reward, average_entropy, episode_entropy/episode_steps, global_t)
           
         self.episode_reward = 0
+        episode_entropy = 0.0
+        episode_steps = 0
         self.environment.reset()
         self.local_network.reset_state()
         break
@@ -307,7 +312,7 @@ class Trainer(object):
     return batch_rp_si, batch_rp_c
   
   
-  def process(self, sess, global_t, summary_writer, summary_op, score_input):
+  def process(self, sess, global_t, summary_writer, summary_op, score_input, average_entropy):
     # Fill experience replay buffer
     if not self.experience.is_full():
       self._fill_experience(sess)
@@ -326,7 +331,8 @@ class Trainer(object):
                              global_t,
                              summary_writer,
                              summary_op,
-                             score_input)
+                             score_input,
+                             average_entropy)
     feed_dict = {
       self.local_network.base_input: batch_si,
       self.local_network.base_last_action_reward_input: batch_last_action_rewards,

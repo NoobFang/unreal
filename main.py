@@ -72,7 +72,9 @@ sess.run(init)
 
 # summary for tensorboard
 score_input = tf.placeholder(tf.int32)
+average_entropy = tf.placeholder(tf.float32)
 tf.summary.scalar("score", score_input)
+tf.summary.scalar("entropy", average_entropy)
 
 summary_op = tf.summary.merge_all()
 summary_writer = tf.summary.FileWriter(LOG_FILE, sess.graph)
@@ -144,7 +146,6 @@ def save(current_global_step):
       train_threads[i] = thread
       thread.start()
 
-
 def train_function(parallel_index):
   """ Train each environment. """
   
@@ -172,7 +173,7 @@ def train_function(parallel_index):
       save(global_t)
 
     diff_global_t = trainer.process(sess, global_t, summary_writer,
-                                    summary_op, score_input)
+                                    summary_op, score_input, average_entropy)
     global_t += diff_global_t
     
     
