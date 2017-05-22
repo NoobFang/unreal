@@ -70,13 +70,16 @@ class UnrealModel(object):
 
   def _create_base_network(self):
     # State (Base image input)
-    self.base_input = tf.placeholder("float", [None, 84, 84, 4])
+    self.base_input = tf.placeholder("float", [None, 84, 84, CHANNELS])
+    self.map_input = tf.placeholder(tf.float32, [None, 84, 84, 3])
 
     # Last action and reward
     self.base_last_action_reward_input = tf.placeholder("float", [None, self._action_size+1])
     
     # Conv layers
     base_conv_output = self._base_conv_layers(self.base_input)
+    map_conv_output = self._map_conv_layers(self.map_input)
+    conv_output = tf.stack([base_conv_output, map_conv_output], axis=0)
     
     # LSTM layer
     self.base_initial_lstm_state0 = tf.placeholder(tf.float32, [1, 256])
@@ -86,18 +89,17 @@ class UnrealModel(object):
                                                                  self.base_initial_lstm_state1)
 
     self.base_lstm_outputs, self.base_lstm_state = \
-        self._base_lstm_layer(base_conv_output,
+        self._base_lstm_layer(conv_output,
                               self.base_last_action_reward_input,
                               self.base_initial_lstm_state)
 
     self.base_pi = self._base_policy_layer(self.base_lstm_outputs) # policy output
     self.base_v  = self._base_value_layer(self.base_lstm_outputs)  # value output
 
-    
-  def _base_conv_layers(self, state_input, reuse=False):
+  def _base_conv_layers(self, state_input, channels=CHANNELS, reuse=False):
     with tf.variable_scope("base_conv", reuse=reuse) as scope:
       # Weights
-      W_conv1, b_conv1 = self._conv_variable([8, 8, 4, 16],  "base_conv1")
+      W_conv1, b_conv1 = self._conv_variable([8, 8, channels, 16],  "base_conv1")
       W_conv2, b_conv2 = self._conv_variable([4, 4, 16, 32], "base_conv2")
 
       # Nodes
@@ -105,16 +107,24 @@ class UnrealModel(object):
       h_conv2 = tf.nn.relu(self._conv2d(h_conv1,     W_conv2, 2) + b_conv2) # stride=2
       return h_conv2
   
+  def _map_conv_layers(self, map_input, channels=3, reuse=False):
+    with tf.variable_scope("map_conv", reuse=reuse) as scope:
+      w1, b1 = self._conv_variable([8, 8, channels, 16], "map_conv1")
+      w2, b2 = self._conv_variable([4, 4, 16, 32], "map_conv2")
+
+      h1 = tf.nn.relu(self._conv2d(map_input, w1, 4) + b1)
+      h2 = tf.nn.relu(self._conv2d(h1, w2, 2) + b2)
+      return h2
   
   def _base_lstm_layer(self, conv_output, last_action_reward_input, initial_state_input,
                        reuse=False):
     with tf.variable_scope("base_lstm", reuse=reuse) as scope:
       # Weights
-      W_fc1, b_fc1 = self._fc_variable([2592, 256], "base_fc1")
+      W_fc1, b_fc1 = self._fc_variable([5184, 256], "base_fc1")
 
       # Nodes
-      conv_output_flat = tf.reshape(conv_output, [-1, 2592])
-      # (-1,9,9,32) -> (-1,2592)
+      conv_output_flat = tf.reshape(conv_output, [-1, 5184])
+      # (-1,9,9,32) -> (-1,2592), 2592*2 -> 5184
       conv_output_fc = tf.nn.relu(tf.matmul(conv_output_flat, W_fc1) + b_fc1)
       # (unroll_step, 256)
 
@@ -160,19 +170,22 @@ class UnrealModel(object):
 
   def _create_pc_network(self):
     # State (Image input) 
-    self.pc_input = tf.placeholder("float", [None, 84, 84, 4])
+    self.pc_input = tf.placeholder("float", [None, 84, 84, CHANNELS])
+    self.pc_map = tf.placeholder(tf.float32, [None, 84, 84, 3])
 
     # Last action and reward
     self.pc_last_action_reward_input = tf.placeholder("float", [None, self._action_size+1])
 
     # pc conv layers
     pc_conv_output = self._base_conv_layers(self.pc_input, reuse=True)
+    map_conv_ouput = self._map_conv_layers(self.pc_map, reuse=True)
+    conv_output = tf.stack([pc_conv_output, map_conv_ouput], axis=0)
 
     # pc lastm layers
     pc_initial_lstm_state = self.lstm_cell.zero_state(1, tf.float32)
     # (Initial state is always resetted.)
     
-    pc_lstm_outputs, _ = self._base_lstm_layer(pc_conv_output,
+    pc_lstm_outputs, _ = self._base_lstm_layer(conv_output,
                                                self.pc_last_action_reward_input,
                                                pc_initial_lstm_state,
                                                reuse=True)
@@ -190,7 +203,7 @@ class UnrealModel(object):
       # State (image input for pixel change)
       W_pc_fc1, b_pc_fc1 = self._fc_variable([256, 9*9*32], "pc_fc1")
         
-      W_pc_deconv_v, b_pc_deconv_v = self._conv_variable([4, 4, 1, 32],
+      W_pc_deconv_v, b_pc_deconv_v = self._conv_variable([4, 4, self._action_size, 32],
                                                          "pc_deconv_v", deconv=True)
       W_pc_deconv_a, b_pc_deconv_a = self._conv_variable([4, 4, self._action_size, 32],
                                                          "pc_deconv_a", deconv=True)
@@ -220,19 +233,22 @@ class UnrealModel(object):
 
   def _create_vr_network(self):
     # State (Image input)
-    self.vr_input = tf.placeholder("float", [None, 84, 84, 4])
+    self.vr_input = tf.placeholder("float", [None, 84, 84, CHANNELS])
+    self.vr_map = tf.placeholder(tf.float32, [None, 84, 84, 3])
 
     # Last action and reward
     self.vr_last_action_reward_input = tf.placeholder("float", [None, self._action_size+1])
 
     # VR conv layers
     vr_conv_output = self._base_conv_layers(self.vr_input, reuse=True)
+    map_conv_output = self._map_conv_layers(self.vr_map, reuse=True)
+    conv_output = tf.stack([vr_conv_output, map_conv_output], axis=0)
 
     # pc lastm layers
     vr_initial_lstm_state = self.lstm_cell.zero_state(1, tf.float32)
     # (Initial state is always resetted.)
     
-    vr_lstm_outputs, _ = self._base_lstm_layer(vr_conv_output,
+    vr_lstm_outputs, _ = self._base_lstm_layer(conv_output,
                                                self.vr_last_action_reward_input,
                                                vr_initial_lstm_state,
                                                reuse=True)
@@ -241,7 +257,7 @@ class UnrealModel(object):
 
     
   def _create_rp_network(self):
-    self.rp_input = tf.placeholder("float", [3, 84, 84, 4])
+    self.rp_input = tf.placeholder("float", [3, 84, 84, CHANNELS])
 
     # RP conv layers
     rp_conv_output = self._base_conv_layers(self.rp_input, reuse=True)
@@ -344,11 +360,12 @@ class UnrealModel(object):
     self.base_lstm_state_out = tf.contrib.rnn.LSTMStateTuple(np.zeros([1, 256]),
                                                              np.zeros([1, 256]))
 
-  def run_base_policy_and_value(self, sess, s_t, last_action_reward):
+  def run_base_policy_and_value(self, sess, s_t, m_t, last_action_reward):
     # This run_base_policy_and_value() is used when forward propagating.
     # so the step size is 1.
     pi_out, v_out, self.base_lstm_state_out = sess.run( [self.base_pi, self.base_v, self.base_lstm_state],
                                                         feed_dict = {self.base_input : [s_t],
+                                                                     self.map_input : [m_t],
                                                                      self.base_last_action_reward_input : [last_action_reward],
                                                                      self.base_initial_lstm_state0 : self.base_lstm_state_out[0],
                                                                      self.base_initial_lstm_state1 : self.base_lstm_state_out[1]} )
@@ -356,11 +373,12 @@ class UnrealModel(object):
     return (pi_out[0], v_out[0])
 
   
-  def run_base_policy_value_pc_q(self, sess, s_t, last_action_reward):
+  def run_base_policy_value_pc_q(self, sess, s_t, m_t, last_action_reward):
     # For display tool.
     pi_out, v_out, self.base_lstm_state_out, q_disp_out, q_max_disp_out = \
         sess.run( [self.base_pi, self.base_v, self.base_lstm_state, self.pc_q_disp, self.pc_q_max_disp],
                   feed_dict = {self.base_input : [s_t],
+                               self.map_input : [m_t],
                                self.base_last_action_reward_input : [last_action_reward],
                                self.base_initial_lstm_state0 : self.base_lstm_state_out[0],
                                self.base_initial_lstm_state1 : self.base_lstm_state_out[1]} )
@@ -369,29 +387,32 @@ class UnrealModel(object):
     return (pi_out[0], v_out[0], q_disp_out[0])
 
   
-  def run_base_value(self, sess, s_t, last_action_reward):
+  def run_base_value(self, sess, s_t, m_t, last_action_reward):
     # This run_bae_value() is used for calculating V for bootstrapping at the 
     # end of LOCAL_T_MAX time step sequence.
     # When next sequcen starts, V will be calculated again with the same state using updated network weights,
     # so we don't update LSTM state here.
     v_out, _ = sess.run( [self.base_v, self.base_lstm_state],
                          feed_dict = {self.base_input : [s_t],
+                                      self.map_input : [m_t],
                                       self.base_last_action_reward_input : [last_action_reward],
                                       self.base_initial_lstm_state0 : self.base_lstm_state_out[0],
                                       self.base_initial_lstm_state1 : self.base_lstm_state_out[1]} )
     return v_out[0]
 
   
-  def run_pc_q_max(self, sess, s_t, last_action_reward):
+  def run_pc_q_max(self, sess, s_t, m_t, last_action_reward):
     q_max_out = sess.run( self.pc_q_max,
                           feed_dict = {self.pc_input : [s_t],
+                                       self.pc_map : [m_t],
                                        self.pc_last_action_reward_input : [last_action_reward]} )
     return q_max_out[0]
 
   
-  def run_vr_value(self, sess, s_t, last_action_reward):
+  def run_vr_value(self, sess, s_t, m_t, last_action_reward):
     vr_v_out = sess.run( self.vr_v,
                          feed_dict = {self.vr_input : [s_t],
+                                      self.vr_map : [m_t],
                                       self.vr_last_action_reward_input : [last_action_reward]} )
     return vr_v_out[0]
 

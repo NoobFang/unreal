@@ -77,9 +77,11 @@ class LabEnvironment(environment.Environment):
   
   def __init__(self):
     environment.Environment.__init__(self)
-    
+    self.depth_bias = np.zeros((84,84,4), dtype=np.uint8)
+    self.depth_bias[:,:,3] = np.ones((84,84), dtype=np.uint8)*180
     self.conn, child_conn = Pipe()
     self.proc = Process(target=worker, args=(child_conn,))
+    self.proc.Daemon = True
     self.proc.start()
     self.conn.recv()
     self.reset()
@@ -88,7 +90,9 @@ class LabEnvironment(environment.Environment):
     self.conn.send([COMMAND_RESET, 0])
     obs = self.conn.recv()
 
-    self.last_state = self._preprocess_frame(obs['RGBD_INTERLACED'])
+    state = self._preprocess_frame(obs['RGBD_INTERLACED'] - self.depth_bias)
+    #self.last_state = np.expand_dims(state[:,:,3], -1)
+    self.last_state = state
     self.last_vtrans = obs['VEL.TRANS']
     self.last_vrot = obs['VEL.ROT']
     self.last_action = 0
@@ -113,7 +117,8 @@ class LabEnvironment(environment.Environment):
     obs, reward, terminal = self.conn.recv()
 
     if not terminal:
-      state = self._preprocess_frame(obs['RGBD_INTERLACED'])
+      state = self._preprocess_frame(obs['RGBD_INTERLACED'] - self.depth_bias)
+      #state = np.expand_dims(state[:,:,3], -1)
       vtrans = obs['VEL.TRANS']
       vrot = obs['VEL.ROT']
     else:

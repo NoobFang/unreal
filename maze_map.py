@@ -50,8 +50,8 @@ class MazeMap(object):
       self.maze = new_maze
 
   def reset(self):
-    self.height = 200
-    self.width = 200
+    self.height = 500
+    self.width = 500
     self.maze = np.zeros((self.height, self.width))
     self.current_h = self.height / 2 # current height position
     self.current_w = self.width / 2 # current width position
@@ -63,7 +63,7 @@ class MazeMap(object):
       result = np.stack([self.maze for _ in range(3)], axis=2)
       h = int(self.current_h)
       w = int(self.current_w)
-      result[h,w,:] = [1, 0, 0]
+      result[h,w,:] = [0.5, 1, 0.5]
       return transform.resize(result, (height, width))
     min_h = np.min(idx_h)
     max_h = np.max(idx_h)
@@ -72,7 +72,7 @@ class MazeMap(object):
     result = np.stack([self.maze for _ in range(3)], axis=2)
     h = int(self.current_h)
     w = int(self.current_w)
-    result[h,w,:] = [1, 0, 0]
+    result[h,w,:] = [0.5, 1, 0.5]
     return transform.resize(result[min_h:max_h+1,min_w:max_w+1,:], (height, width))
     
 

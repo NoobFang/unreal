@@ -303,7 +303,7 @@ else:
 clock = pygame.time.Clock()
 
 running = True
-recording = False
+recording = True
 frame_saving = False
 fps = 15
 

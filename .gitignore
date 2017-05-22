@@ -1,6 +1,7 @@
 *.pyc
 debug*.png
 *.mov
+*.avi
 log
 checkpoints
 memo.txt

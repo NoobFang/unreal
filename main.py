@@ -144,6 +144,7 @@ def save(current_global_step):
     if i != 0:
       thread = threading.Thread(target=train_function, args=(i,))
       train_threads[i] = thread
+      thread.setDaemon(True)
       thread.start()
 
 def train_function(parallel_index):
@@ -192,6 +193,7 @@ signal.signal(signal.SIGINT, signal_handler)
 start_time = time.time() - wall_t
 
 for t in train_threads:
+  t.setDaemon(True)
   t.start()
 
 print('Press Ctrl+C to stop')

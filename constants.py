@@ -2,8 +2,8 @@
 LOCAL_T_MAX = 20 # repeat step size
 RMSP_ALPHA = 0.99 # decay parameter for RMSProp
 RMSP_EPSILON = 0.1 # epsilon parameter for RMSProp
-CHECKPOINT_DIR = '/hik/home/fanghanyin/unreal/checkpoints/random3/RGBD'
-LOG_FILE = '/hik/home/fanghanyin/unreal/log/random3/RGBD'
+CHECKPOINT_DIR = '/hik/home/fanghanyin/unreal/checkpoints/random3/RGBDwithMAP'
+LOG_FILE = '/hik/home/fanghanyin/unreal/log/random3/RGBDwithMAP'
 INITIAL_ALPHA_LOW = 1e-4    # log_uniform low limit for learning rate
 INITIAL_ALPHA_HIGH = 5e-3   # log_uniform high limit for learning rate
 PARALLEL_SIZE = 32 # parallel thread size
@@ -33,3 +33,5 @@ SAVE_INTERVAL_STEP = 300 * 1000
 
 GRAD_NORM_CLIP = 40.0 # gradient norm clipping
 USE_GPU = True # To use GPU, set True
+
+CHANNELS = 4 # the numbler of input channels

@@ -9,8 +9,9 @@ from collections import deque
 
 
 class ExperienceFrame(object):
-  def __init__(self, state, reward, action, terminal, pixel_change, last_action, last_reward):
+  def __init__(self, state, map_state, reward, action, terminal, pixel_change, last_action, last_reward):
     self.state = state
+    self.map_state = map_state
     self.action = action # (Taken action with the 'state')
     self.reward = np.clip(reward, -1, 1) # Reveived reward with the 'state'. (Clipped)
     self.terminal = terminal # (Whether terminated when 'state' was inputted)
