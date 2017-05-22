@@ -99,6 +99,8 @@ class Trainer(object):
     new_state, reward, terminal, pixel_change, vtrans, vrot = self.environment.process(action)
     
     self.mazemap.update(vtrans, vrot)
+    if reward > 9:
+      self.mazemap.reset()
     map_state = self.mazemap.get_map(84, 84)
     
     frame = ExperienceFrame(prev_state, map_state, reward, action, terminal, pixel_change,
@@ -169,6 +171,8 @@ class Trainer(object):
       new_state, reward, terminal, pixel_change, vtrans, vrot = self.environment.process(action)
       
       self.mazemap.update(vtrans, vrot)
+      if reward > 9:
+        self.mazemap.reset()
 
       frame = ExperienceFrame(prev_state, prev_map_state, reward, action, terminal, pixel_change,
                               last_action, last_reward)
